@@ -758,6 +758,8 @@ For now, it simply goes up:
   (snake-position-update))
 ```
 
+What about a collision with a wall ?
+
 ## stuff
 
 That's it, simply use the `list` identifier.
