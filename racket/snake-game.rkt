@@ -71,17 +71,17 @@
 ; snake definitions
 (define snake-coords
   (let ([val (round (- ( / grid-size 2) 1))])
-    (list val val)))
+    (list val (+ val 1))))
 
 (define (snake-position-update)
   (begin (update-tile snake-coords "empty")
          (let* ([new-coords (list (list-ref snake-coords 0) (- (list-ref snake-coords 1) 1))]
                 [next-tile (read-tile new-coords)])
-           (if (not (equal? (list-ref next-tile 2) "empty"))
+           (if (equal? (list-ref next-tile 2) "blank")
                (begin
                  (set! snake-coords new-coords)
                  (update-tile new-coords "snake"))
-               (begin (print "quit")(quit))))))
+               (quit)))))
 
 ; game definitions
 (define (game-loop)
