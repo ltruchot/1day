@@ -1,0 +1,10 @@
+#lang racket
+(require r-cade)
+
+; main function, called once per frame
+(define (game-loop)
+  (cls) ; clear view
+  (text 2 2 (frame))) ; show frame number as text
+
+; 128px window runing a loop at 60frame/s speed
+(run game-loop 128 128)

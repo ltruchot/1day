@@ -1,0 +1,4 @@
+#lang slideshow
+(define eye (circle 10))
+(define nose (rectangle 10 20))
+(define face (ht-append 20 eye nose eye))
