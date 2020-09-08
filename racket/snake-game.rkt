@@ -16,8 +16,18 @@
 ;;; read 1 tile
 (define (read-tile coord)
   (let* ([row (list-ref grid (list-ref coord 1))]
-        [tile (list-ref row (list-ref coord 0))]) 
-         tile))
+         [tile (list-ref row (list-ref coord 0))]) 
+    tile))
+;;; check if a tile is blank
+(define (is-tile-blank coords)
+  (let* ([tile (read-tile coords)]
+         [type (list-ref tile 2)])
+    (equal? type "blank")))
+(define (is-tile-apple coords)
+  (let* ([tile (read-tile coords)]
+         [type (list-ref tile 2)])
+    (equal? type "apple")))
+
 ;;; update 1 tile
 (define (update-tile coord val)
   (set! grid
@@ -71,25 +81,87 @@
 ; snake definitions
 (define snake-coords
   (let ([val (round (- ( / grid-size 2) 1))])
-    (list val (+ val 1))))
+    (list (list val val))))
+(define snake-direction "up")
+(define opposite-direction "down")
 
-(define (snake-position-update)
-  (begin (update-tile snake-coords "empty")
-         (let* ([new-coords (list (list-ref snake-coords 0) (- (list-ref snake-coords 1) 1))]
-                [next-tile (read-tile new-coords)])
-           (if (equal? (list-ref next-tile 2) "blank")
-               (begin
-                 (set! snake-coords new-coords)
-                 (update-tile new-coords "snake"))
-               (quit)))))
+
+
+;;; setters
+(define (move direction)
+  (begin
+    (when
+        (not (equal? direction opposite-direction))
+      (begin
+        (set! snake-direction direction)
+        (set! opposite-direction
+              (case snake-direction
+                [("up") "down"]
+                [("right") "left"]
+                [("down") "up"]
+                [("left") "right"]))))))
+
+;;; actions mapping
+(define (snake-action)
+  (let ([direction (cond [(btn-up) "up"]
+                         [(btn-right) "right"]
+                         [(btn-down) "down"]
+                         [(btn-left) "left"]
+                         [else snake-direction])])
+    (move direction)))
+
+
+; apples
+(define (draw-random-apple)
+  (let* ([x (random 1 20)]
+         [y (random 1 20)]
+         [coords (list x y)])
+    (if (is-tile-blank coords)
+        (update-tile coords "apple")
+        (draw-random-apple))))
+
 
 ; game definitions
+(define game-speed 5)
+
+(define (game-update)    
+  (let*
+      ([x (list-ref (first snake-coords) 0)]
+       [y (list-ref (first snake-coords) 1)]
+       [new-coords(case snake-direction
+          [("top")(list x (- y 1))]
+          [("down")(list x (+ y 1))]
+          [("right")(list (+ x 1) y)]
+          [("left")(list (- x 1) y)])])
+    (cond [(is-tile-blank new-coords)
+           (begin
+             (update-tile (last snake-coords) "blank")
+             (set! snake-coords
+                   (drop-right
+                    (append (list new-coords) snake-coords) 1))
+             (update-tiles snake-coords "snake"))]
+          [(is-tile-apple new-coords)
+           (begin
+             (set! snake-coords
+                   (append (list new-coords) snake-coords))
+             (update-tiles snake-coords "snake")
+             (draw-random-apple))]
+          [else (quit)])))
+
 (define (game-loop)
-  (cls)
-  (snake-position-update)
+  (cls); clear screen
+  (snake-action); get user inputs
+  (when
+      (=
+       (modulo (frame) (/ 60 game-speed))
+       0)
+    (game-update)); refresh the view with new data
   (draw-grid grid))
 
 ; procedure
 (update-tiles wall-coords "wall")
-(update-tile snake-coords "snake")
-(run game-loop grid-size grid-size #:fps 2)
+(update-tiles snake-coords "snake")
+(draw-random-apple)
+(run game-loop grid-size grid-size #:fps 60)
+
+

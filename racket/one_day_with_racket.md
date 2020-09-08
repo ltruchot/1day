@@ -606,7 +606,7 @@ Indeed,
 
 will draw on top-left a 1x20 sized rectangle, filled with a braun color.
 
-![rcad rect](./img/17-r-cade_rect.png)
+![r-cade rect](./img/17-r-cade_rect.png)
 
 You remember `begin`, that chain functions.
 I execute first the function `color` to pick a color in a [16 color palette](https://docs.racket-lang.org/r-cade/index.html?q=r-cade#%28def._%28%28lib._r-cade%2Fmain..rkt%29._color%29%29) (4 = braun) for the next steps.
@@ -710,13 +710,15 @@ What we need know is some stuff to draw that on the window:
 
 We just produce braun rectangles (or other colors) for each related info we have in the grid.
 
-![rcad walls](./img/18-r-cade_walls.png)
+![r-cade walls](./img/18-r-cade_walls.png)
 
 > hum... 8:12 PM. Let's take a final dinner-pause. I feel some doubts about my capacity to end up this challenge...
 > But hope drive me !
 > I want to brag in work tomorrow, so failing is not an option.
 
 #### The Snake
+
+##### Show it
 
 I wanted a centered snake, so I change my grid size to 21. The center should be (10 10) and I calculate it (because I want to be able to change the size of wy grid).
 
@@ -736,7 +738,9 @@ If I want it to move 2 times per seconds, I have to change the framerate.
 (run game-loop grid-size grid-size #:fps 2)
 ```
 
-![rcad walls](./img/19-r-cade_snake.png)
+![r-cade snake](./img/19-r-cade_snake.png)
+
+##### Move it
 
 Make it move will happen just after each draw, for the next. What we want to do is make the head of the snake follow a direction each redraw, until an event.
 
@@ -744,7 +748,7 @@ For now, it simply goes up:
 
 ```scheme
 (define (snake-position-update)
-  (begin (update-tile snake-coords "empty")
+  (begin (update-tile snake-coords "blank")
          (let [(new-coords (list (list-ref snake-coords 0) (- (list-ref snake-coords 1) 1)))]
            (set! snake-coords new-coords)
            (update-tile new-coords "snake"))))
@@ -754,24 +758,315 @@ For now, it simply goes up:
 ; game definitions
 (define (game-loop)
   (cls)
-  (draw-grid grid)
-  (snake-position-update))
+  (snake-position-update)
+  (draw-grid grid))
 ```
 
 What about a collision with a wall ?
+We can use `quit` that stops the game when it occurs.
 
-## stuff
+```scheme
+(define (snake-position-update)
+  (begin (update-tile snake-coords "blank")
+         (let* ([new-coords (list (list-ref snake-coords 0) (- (list-ref snake-coords 1) 1))]
+                [next-tile (read-tile new-coords)])
+           (if (equal? (list-ref next-tile 2) "blank")
+               (begin
+                 (set! snake-coords new-coords)
+                 (update-tile new-coords "snake"))
+               (quit)))))
+```
 
-That's it, simply use the `list` identifier.
-The next thing to know to be able to memorize a list of things to do,
-is of course creating a list a `pict`:
+##### Control it
 
-- `(list (circle 10) (rectangle 10 10) (disk 10))`
-- -`
+I suspect an awesome lang like r-cade to embed every thing we need
+to change the direction of the snake when press arrows.
+
+```scheme
+(define snake-direction "top")
+
+(define (move direction) (set! snake-direction direction))
+
+(define (snake-action)
+  (let ([direction (cond [(btn-up) "up"]
+                         [(btn-right) "right"]
+                         [(btn-down) "down"]
+                         [(btn-left) "left"]
+                         [else snake-direction])])
+    (move direction)))
+(trace move)
+```
+
+Isn't it self explanatory ?
+When `snake-action` will be called.
+We will check wich button is currently pressed and move in the related direction.
+We have to plug that is the loop and wait to see the effect!
+
+```scheme
+(define (game-loop)
+  (cls)
+  (snake-action)
+  (snake-position-update)
+  (draw-grid grid))
+```
+
+Ready for the final step, make the move itself dependant to this direction.
+We just have to adujst the next `x` and `y` differently according to this direction.
+
+```scheme
+;; snake update
+(define (snake-position-update)
+  (begin
+    (update-tile snake-coords "blank")
+    (let*
+        ([x (list-ref snake-coords 0)]
+         [y (list-ref snake-coords 1)]
+         [new-coords
+          (case snake-direction
+            [("top")(list x (- y 1))]
+            [("down")(list x (+ y 1))]
+            [("right")(list (+ x 1) y)]
+            [("left")(list (- x 1) y)]
+            [else (list x (- y 1))])]
+
+         [next-tile (read-tile new-coords)])
+      (if (equal? (list-ref next-tile 2) "blank")
+          (begin
+            (set! snake-coords new-coords)
+            (update-tile new-coords "snake"))
+          (quit)))))
+
+```
+
+![r-cade move](./img/20-r-cade_move.png)
+
+And... it work well, despite the fact that the loop reiterate every 500ms,
+which is not sufficient to get all the input when I press too quickly the buttons.
+
+```scheme
+; game definitions
+(define game-speed 3)
+(define (game-loop)
+  (cls); clear screen
+  (snake-action); get user inputs
+  (when
+      (=
+       (modulo (frame) (/ 60 game-speed))
+       0)
+    (snake-position-update)); change snake position
+  (draw-grid grid))
+; procedure
+(update-tiles wall-coords "wall")
+(update-tile snake-coords "snake")
+(run game-loop grid-size grid-size #:fps 60)
+```
+
+To ensure every `keypress` events are taken, I revert the fps to 60,
+then I define a game-speed that will slow the view update process.
+`when` is what you find when you search for "if without else in racket".
+The `modulo` makes sleeps the update all turns excepts the chosen one.
+
+> Believe it or not, it's 10:20 PM and we still don't have beat the main complexity of the snake problem.
+> I can't sleep with that it mind, so I'll continue: but as usual in informatics: devil is in the details, and estimation is story-telling.
+
+#### The apples
+
+The specs I made says that there is always only one apple in the fields, that could be eaten by the snake: in this case a new one will pop. But it have to pop in a non-blank tile, so I suspect I will need something like:
+
+```scheme
+;;; read 1 tile
+(define (read-tile coord)
+  (let* ([row (list-ref grid (list-ref coord 1))]
+         [tile (list-ref row (list-ref coord 0))])
+    tile))
+;;; check if a tile is blank
+(define (is-tile-blank coords)
+  (let* ([tile (read-tile coords)]
+         [type (list-ref tile 2)])
+    (equal? type "blank")))
+```
+
+We will need some randomisation here. You can imagine it exists in `racket`:
+
+```scheme
+; apples
+(define (draw-random-apple)
+  (let* ([x (random 1 20)]
+         [y (random 1 20)]
+         [coords (list x y)])
+    (if (is-tile-blank coords)
+        (update-tile coords "apple")
+        (draw-random-apple))))
+;...
+(draw-random-apple)
+(run game-loop grid-size grid-size #:fps 60)
+```
+
+![r-cade apple](./img/21-r-cade_apple.png)
+
+The recursion act as a loop here:
+until the coords are not blank, let's re-draw. When it's ok, we get the result. We just make sure to draw one before the start, here we go.
+
+#### Collisions
+
+When the snake meet an apple
+
+- the apple is removed
+- the snake grow
+- a new apple pop
+
+The first and the second step could be a common step: we decide to replace the apple with a snake part.
+I will change the name of `snake-update-position` to `game-update` that reflect better the situation.
+
+```scheme
+(define (game-update)
+  (begin
+    (update-tile snake-coords "blank")
+    (let*
+        ([x (list-ref snake-coords 0)]
+         [y (list-ref snake-coords 1)]
+         [new-coords
+          (case snake-direction
+            [("top")(list x (- y 1))]
+            [("down")(list x (+ y 1))]
+            [("right")(list (+ x 1) y)]
+            [("left")(list (- x 1) y)]
+            [else (list x (- y 1))])])
+      (cond [(is-tile-blank new-coords)
+             (begin
+               (set! snake-coords new-coords)
+               (update-tile new-coords "snake"))]
+            [(is-tile-apple new-coords)
+             (begin
+               (set! snake-coords new-coords)
+               (update-tile new-coords "snake")
+               (draw-random-apple))]
+            [else (quit)]))))
+```
+
+Works well... if we forget that the snak should grow.
+And this part sounds to me like the real complexity: now the snake have to be a list of following coords and not a point.
+
+> Late, so late, I'm tired. Let's try, but I can't promise anything.
+
+Snake as a list:
+
+```scheme
+; snake definitions
+(define snake-coords
+  (let ([val (round (- ( / grid-size 2) 1))])
+    (list (list val val))))
+(define snake-direction "top")
+```
+
+Now, let's replace all
+
+```scheme
+(update-tile snake-coords "snake")
+```
+
+with (see the extra "s" ?)
+
+```scheme
+(update-tiles snake-coords "snake")
+```
+
+and
+
+```
+(list-ref snake-coords 0)
+```
+
+with
+
+```
+(list-ref (first snake-coords) 0)
+```
+
+Indeed, `first` returns the first element of a list.
+
+Amazingly it work directly!
+
+Now, the part the make me afraid. To make grow the snake, we will add a tail to the list just after the moment it eat an apple.
+
+The snake is now a list of coordinates, that follow each others. When the snake will move, a new coordinate will replace the head of this list, and the tail of this list will disappear. So the re-draw will reflect this list shift.
+
+```scheme
+(cond [(is-tile-blank new-coords)
+        (begin
+          (update-tile (last snake-coords) "blank")
+          (set! snake-coords
+                (drop-right
+                (append (list new-coords) snake-coords) 1))
+          (update-tiles snake-coords "snake"))]
+      [(is-tile-apple new-coords)
+        (begin
+          (set! snake-coords
+                (append (list new-coords) snake-coords))
+          (update-tiles snake-coords "snake")
+          (draw-random-apple))]
+      [else (quit)])))
+```
+
+`append` to "update immutably" the list and `drop-right` to do the remove job. In other word, we do some insert first/remove last, treating our snake as a [linked list](https://en.wikipedia.org/wiki/Linked_list).
+
+![r-cade size](./img/22-r-cade_size.png)
+
+The very last defect is the fact that, when we press the opposite direction of the current one, the game quit.
+Indeed, the head of the snake eat itself, because the tail of the snake is here.
+
+We want to prevent the user to go back, so we can add a condition that say depending your current direction, you can't go back.
+The logic looks like:
+
+```scheme
+(define snake-direction "up")
+(define opposite-direction "down")
+(define (set-opposite-direction dir)
+  (set! opposite-direction
+        (case dir
+          [("up") "down"]
+          [("right") "left"]
+          [("down") "up"]
+          [("left") "right"])))
+```
+
+Then in `game-update`, when the move is really made:
+
+```scheme
+(cond [(is-tile-blank new-coords)
+        (begin
+          (update-tile (last snake-coords) "blank")
+          (set! snake-coords (drop-right new-snake 1))
+          (update-tiles snake-coords "snake")
+          (set-opposite-direction snake-direction))]
+      [(is-tile-apple new-coords)
+        (begin
+          (set! snake-coords new-snake)
+          (update-tiles snake-coords "snake")
+          (set-opposite-direction snake-direction)
+          (draw-random-apple))]
+      [else (quit)])))
+```
+
+Here we are! A real snake game, made with racket, working perfectly! Happiness fills my soul and tired body.
+
+![r-cade final-snake](./img/23-r-cade_final-snake.png)
+
+> 00:01 it was a long, but also an amazing and rewarding experience.
+> Racket bring simplicity, expressiveness and well-made baked-in community DSL on the table.
+>
+> Before publishing this article, I'll take the time to correct this notes and refacto my final code that you can find on the github repo.
+> I'll find as well resources to go further, shared in this article. Thank you for your reading me, following me, sharing that and for you patience during this looooong journey.
+>
+> Hope to see you soon!
 
 ## Resources to go further
 
-I just discovered this language and this world, but after this day about racket,
-I dive a little more into podcast and videos. Here is what I found:
+I just discovered this language and this LISP world, but after one day with racket,
+I decided to dive a little more into podcast and videos. Here is what I found:
 
-- [Language-Oriented Programming with Racket - Matthias Felleisen](https://www.youtube.com/watch?v=z8Pz4bJV3Tk)
+- Videos
+
+  - [Language-Oriented Programming with Racket - Matthias Felleisen](https://www.youtube.com/watch?v=z8Pz4bJV3Tk)
+
+- ## Podcasts
