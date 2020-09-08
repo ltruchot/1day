@@ -84,23 +84,21 @@
     (list (list val val))))
 (define snake-direction "up")
 (define opposite-direction "down")
+(define (set-opposite-direction dir)
+  (set! opposite-direction
+        (case dir
+          [("up") "down"]
+          [("right") "left"]
+          [("down") "up"]
+          [("left") "right"])))
 
 
 
 ;;; setters
 (define (move direction)
-  (begin
-    (when
-        (not (equal? direction opposite-direction))
-      (begin
-        (set! snake-direction direction)
-        (set! opposite-direction
-              (case snake-direction
-                [("up") "down"]
-                [("right") "left"]
-                [("down") "up"]
-                [("left") "right"]))))))
-
+  (when
+      (not (equal? direction opposite-direction))
+    (set! snake-direction direction)))
 ;;; actions mapping
 (define (snake-action)
   (let ([direction (cond [(btn-up) "up"]
@@ -122,29 +120,30 @@
 
 
 ; game definitions
-(define game-speed 5)
+(define game-speed 10)
 
 (define (game-update)    
   (let*
       ([x (list-ref (first snake-coords) 0)]
        [y (list-ref (first snake-coords) 1)]
-       [new-coords(case snake-direction
-          [("top")(list x (- y 1))]
+       [new-coords
+        (case snake-direction
+          [("up")(list x (- y 1))]
           [("down")(list x (+ y 1))]
           [("right")(list (+ x 1) y)]
-          [("left")(list (- x 1) y)])])
+          [("left")(list (- x 1) y)])]
+       [new-snake (append (list new-coords) snake-coords)])
     (cond [(is-tile-blank new-coords)
            (begin
              (update-tile (last snake-coords) "blank")
-             (set! snake-coords
-                   (drop-right
-                    (append (list new-coords) snake-coords) 1))
-             (update-tiles snake-coords "snake"))]
+             (set! snake-coords (drop-right new-snake 1))
+             (update-tiles snake-coords "snake")
+             (set-opposite-direction snake-direction))]
           [(is-tile-apple new-coords)
            (begin
-             (set! snake-coords
-                   (append (list new-coords) snake-coords))
+             (set! snake-coords new-snake)
              (update-tiles snake-coords "snake")
+             (set-opposite-direction snake-direction)
              (draw-random-apple))]
           [else (quit)])))
 
