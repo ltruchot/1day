@@ -1,53 +1,60 @@
 #lang racket
 (require r-cade)
-(require racket/trace)
 
 ; grid definitions
-;; grid values
+; -- size of a side
 (define grid-size 21)
+
+; -- biggest index
 (define max-grid-index (- grid-size 1))
+
+; -- mutable grid with only blank tiles at first
 (define grid
   (build-list
    grid-size
-   (lambda (y)
-     (build-list grid-size (lambda (x) (list x y "blank"))))))
+   (lambda (y)(build-list
+               grid-size
+               (lambda (x) (list x y "blank"))))))
 
-;; grid functions
-;;; read 1 tile
+; -- read 1 tile in grid
 (define (read-tile coord)
   (let* ([row (list-ref grid (list-ref coord 1))]
          [tile (list-ref row (list-ref coord 0))]) 
     tile))
-;;; check if a tile is blank
+
+; -- check tile type in grid
+(define (is-tile-of-type coords type)
+  (let* ([tile (read-tile coords)]
+         [tile-type (list-ref tile 2)])
+    (equal? type tile-type)))
+
+; -- check if tile is blank
 (define (is-tile-blank coords)
-  (let* ([tile (read-tile coords)]
-         [type (list-ref tile 2)])
-    (equal? type "blank")))
+  (is-tile-of-type coords "blank"))
+
+; -- check if tile is apple
 (define (is-tile-apple coords)
-  (let* ([tile (read-tile coords)]
-         [type (list-ref tile 2)])
-    (equal? type "apple")))
+  (is-tile-of-type coords "apple"))
 
-;;; update 1 tile
+; -- update 1 tile in grid
 (define (update-tile coord val)
-  (set! grid
-        (list-update
-         grid
-         (list-ref coord 1)
-         (lambda (row)
-           (list-update
-            row
-            (list-ref coord 0)
-            (lambda (tile)
-              (list-set tile 2 val)))))))
+  (let* ([row-idx (list-ref coord 1)]
+         [cell-idx (list-ref coord 0)]
+         [row (list-ref grid row-idx )]
+         [tile (list-ref row cell-idx)]
+         [updated (list-set tile 2 val)])
+    (set!
+     grid (list-set grid row-idx
+                    (list-set row cell-idx updated)))))
 
-;;; update several tiles
+; -- update a list of tiles
 (define (update-tiles coords val)
   (for-each
    (lambda (coord)(update-tile coord val))
    coords))
 
 ; wall definitions
+; -- list of wall coordinates
 (define wall-coords
   (let ([top (build-list grid-size (lambda (x)(list x 0)))]
         [bottom (build-list grid-size (lambda (x)(list x max-grid-index)))]
@@ -58,6 +65,7 @@
     (append top bottom left right)))
 
 ; draw definitions
+; -- color code association to tile type
 (define (color-code tile-type)
   (case tile-type
     [("wall") 4]
@@ -65,25 +73,35 @@
     [("apple") 8]
     [else 7]))
 
+; -- draw colored grid on screen with
 (define (draw-grid grid)
   (for-each
    (lambda (row)
      (for-each
       (lambda (tile)
-        (begin (color (color-code (list-ref tile 2)))
-               (rect
-                (list-ref tile 0)
-                (list-ref tile 1)
-                1 1
-                #:fill #t))) row)) grid))
+        (let ([type (list-ref tile 2)]
+              [x (list-ref tile 0)]
+              [y (list-ref tile 1)])
+          (begin
+            (color (color-code type)); color setted for next function
+            (rect x y 1 1 #:fill #t))))
+      row))
+   grid))
 
 
 ; snake definitions
+; -- mutable list of coordidnate
 (define snake-coords
   (let ([val (round (- ( / grid-size 2) 1))])
     (list (list val val))))
+
+; -- mutable snake current direction
 (define snake-direction "up")
+
+; -- mutable direction opposed to current
 (define opposite-direction "down")
+
+; -- re-calculate opposite direction
 (define (set-opposite-direction dir)
   (set! opposite-direction
         (case dir
@@ -92,24 +110,24 @@
           [("down") "up"]
           [("left") "right"])))
 
-
-
-;;; setters
+; -- change direction
 (define (move direction)
   (when
       (not (equal? direction opposite-direction))
     (set! snake-direction direction)))
-;;; actions mapping
+
+; -- user actions on snake
 (define (snake-action)
-  (let ([direction (cond [(btn-up) "up"]
-                         [(btn-right) "right"]
-                         [(btn-down) "down"]
-                         [(btn-left) "left"]
-                         [else snake-direction])])
+  (let ([direction
+         (cond [(btn-up) "up"]
+               [(btn-right) "right"]
+               [(btn-down) "down"]
+               [(btn-left) "left"]
+               [else snake-direction])])
     (move direction)))
 
-
-; apples
+; apples definitions
+; -- draw an new random apple
 (define (draw-random-apple)
   (let* ([x (random 1 20)]
          [y (random 1 20)]
@@ -120,8 +138,10 @@
 
 
 ; game definitions
-(define game-speed 10)
+; -- game speed by frame (a multiple of 60)
+(define game-speed 6)
 
+; -- changes calculated on game update
 (define (game-update)    
   (let*
       ([x (list-ref (first snake-coords) 0)]
@@ -147,6 +167,7 @@
              (draw-random-apple))]
           [else (quit)])))
 
+; -- loop that will run until game over
 (define (game-loop)
   (cls); clear screen
   (snake-action); get user inputs
@@ -157,10 +178,10 @@
     (game-update)); refresh the view with new data
   (draw-grid grid))
 
-; procedure
+; final procedure
 (update-tiles wall-coords "wall")
 (update-tiles snake-coords "snake")
 (draw-random-apple)
-(run game-loop grid-size grid-size #:fps 60)
+(run game-loop grid-size grid-size #:fps 60); launch game!
 
 
